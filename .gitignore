@@ -1,0 +1,4 @@
+test/*.fasta
+test/*.backup
+.vscode/
+__pycache__/

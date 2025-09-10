@@ -1,0 +1,7 @@
+gene_label,sequence,sequence_type,repository,accession,patch,start,end,sense,species_subgroup,subgroup_type,notes,gene_start,gene_end,utr_5_prime_start,utr_5_prime_end,leader_1_start,leader_1_end,leader_2_start,leader_2_end,v_rs_start,v_rs_end,d_rs_3_prime_start,d_rs_3_prime_end,d_rs_5_prime_start,d_rs_5_prime_end,j_codon_frame,j_rs_start,j_rs_end,j_cdr3_end
+TEST_V_PLUS,ATCGATCG,V,GenBank,TEST001,1,100,200,+,,,Test V gene plus sense,141,160,100,120,121,140,,,161,200,,,,,,,
+TEST_V_MINUS,ATCGATCG,V,GenBank,TEST002,1,100,200,-,,,Test V gene minus sense,141,160,161,180,181,200,,,100,120,,,,,,,
+TEST_D_PLUS,ATCGATCG,D,GenBank,TEST003,1,100,150,+,,,Test D gene plus sense,121,130,,,,,,,131,150,,,100,120,,,
+TEST_D_MINUS,ATCGATCG,D,GenBank,TEST004,1,100,150,-,,,Test D gene minus sense,121,130,,,,,,,100,120,131,150,,,,,
+TEST_J_PLUS,ATCGATCG,J,GenBank,TEST005,1,100,150,+,,,Test J gene plus sense,121,150,,,,,,,,,,,,,100,120,
+TEST_J_MINUS,ATCGATCG,J,GenBank,TEST006,1,100,150,-,,,Test J gene minus sense,100,120,,,,,,,,,,,,,121,150,

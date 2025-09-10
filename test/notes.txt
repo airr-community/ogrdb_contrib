@@ -1,0 +1,70 @@
+prerequisites:
+- A set of allele sequences, named, gapped sequences for V alleles
+- For those sequences that are genomically backed, repository accession numbers, and coordinates of each sequence in one or more of the genbank entries
+- Genbank records are strongly preferred, as they can be checked by the code and links provided in OGRDB
+
+steps:
+- populate a copy of sequence_evidence_blank.csv with details of all genomic evidence:
+   - each row lists one piece of evidence for one allele
+   - multiple pieces of evidence (multiple genbank records) may be provided for an allele, on multiple rows 
+   - 'gene_label' is the assigned name of the allele
+   - 'sequence' is the sequence of the annotated sequence in 5' to 3' orientation, including all annotated features
+   - 'sequence_type' is V, D, J or C
+   - 'repository' must be 'Genbank' for Genbank, or another repository designation
+   - 'accession' is the accession id in the repository
+   - 'patch' is the patch level in the repository
+   - 'sense' must be + if the sequence in the repository is in 5' to 3' annotation and - otherwise
+   - 'species_subgroup' and 'subgroup_type' must be completed with the designated values agreed for this strain or breed, or left blank if none have been agreed.
+     These are only used in cases where records for multiple strains, breeds etc are anticipated.
+   - 'start' and 'end' denote the location of the entire annotated sequence in the genbank record. They, and all feature coordinates:
+     must follow the following conventions:
+        - all coordinates must be given in 1-based inclusive form
+        - coordinates start and end must denote the location of the annotated sequence or feature in the genbank record. The coordinates must be 
+            the actual coordinates of the sequence in the orientatation of the sequence found in genbank, and start must be < end 
+            regardless of orientation
+   - 'gene_start', 'gene_end' denote the start and end of the core coding sequence of the gene (eg V-REGION). They must be included.
+   - all other annotated features should be included
+   - for J-genes, j_cdr3_end should be the index of the end of the CDR3 region, normally indicated byt the [WF]G.G motif. The receptor_utils
+     annotate_j tool can be used to determine this.
+
+- run check_evidence.py to verify the evidence file. For Genbank records, the script can download records from Genbank for checking. In other cases,
+  the genomic evidence must be downloaded from the repository into files named after the accession id.
+
+- fix any errors reported and move on to the next step once all errors are fixed.
+
+- populate a copy of sequence_upload_blank.csv with a list of the alleles to be uploaded to OGRDB. All alleles to be uploaded must be included
+  and there should only be one line in the file for each allele.
+  - 'gene_label' is the assigned name of the allele
+  - 'imgt' is the IUIS name of the allele if one has been issued 
+  - 'functional' is F, ORF or P, using the Digger definition of F. If this has not been determined, use ORF if the core coding sequence does not contain stop codons,
+     F otherwise
+  - 'type' <locus><type> where <locus> is IGH, IGK, IGL, TRA, TRB, TRD or TRG and <type> is V, D, J or C
+  - 'inference_type' is 'Unrearranged, 'Unrearranged and rearranged', or 'Rearranged Only'. Genomic evidence must be provided in the evidence file for all alleles in the 
+    first two categories.
+  - 'sequence' is the sequence of the annotated sequence in 5' to 3' orientation, including all annotated features
+  - 'sequence_gapped' is the IMGT-gapped V-REGION for V genes, and blank otherwise.
+  - 'species_subgroup' and 'subgroup_type' must be completed with the designated values agreed for this strain or breed, or left blank if none have been agreed.
+  - 'alt_names' is a comma-separated list of any other names by which this allele sequence has been known in the past which are worth mentioning
+  - 'affirmation' should be 1
+  - 'chromosome' should be the chromosome number or other identifier for this locus
+  - 'paralogs' should list any other sequences in the reference set which have an identical core coding region
+  - when paralogs are listed, 'varb_rep' must list the gene_label of the single allele in the set of paralogs that should be listed in non-abmiguous reference sets,
+    otherwise it should be blank.
+  - 'notes' should list any notes on functionality
+  - 'inferred_ext', 'ext_3_prime' and 'ext_5_prime' are generally not used - they allow the submission to indicate that the provided sequence of a V allele has been
+    extended without conclusive evidence by homology with other alleles of the gene. Under normal circumstances they should be left blank.
+  - 'curational_tags' are used in some circumstances with inferred repertoires. Permitted values are 'likely_truncated' and 'likely_full_length'. In other
+    circumstances the field should be blank.
+  - 'mapped' should be Y if the sequence is supported by genomic evidence that is sufficient to localise the gene within the locus, otherwise blank.
+
+  - Remaining fields in the file denote coordinates of the features in the sequence provided in the 'sequence' column. These will be determined by populate_upload.py,
+    either from the evidence file or, for rearranged inferences, from sequence data in the upload file. In this latter case, for V and D genes, 'sequence' 
+    will simply be the sequence of the core coding region, and 'gene_start' will be 1, and 'gene_end' will equate to the length of 'sequence'. 
+  - for J-genes, where genomic evidence does not exist, j_cdr3_end should be the index of the end of the CDR3 region, normally indicated byt the [WF]G.G motif. The receptor_utils
+    annotate_j tool can be used to determine this.
+
+
+
+
+
+

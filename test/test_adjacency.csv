@@ -1,0 +1,4 @@
+gene_label,sequence,sequence_type,repository,accession,patch,start,end,sense,species_subgroup,subgroup_type,notes,gene_start,gene_end,utr_5_prime_start,utr_5_prime_end,leader_1_start,leader_1_end,leader_2_start,leader_2_end,v_rs_start,v_rs_end,d_rs_3_prime_start,d_rs_3_prime_end,d_rs_5_prime_start,d_rs_5_prime_end,j_codon_frame,j_rs_start,j_rs_end,j_cdr3_end
+TEST_V_BAD_ADJ,ATCGATCGATCG,V,GenBank,TEST001,1,100,200,+,,,Test V gene with bad adjacency,150,160,100,120,125,140,,,170,200,,,,,,,
+TEST_D_GOOD_ADJ,ATCGATCG,D,GenBank,TEST002,1,100,150,+,,,Test D gene with good adjacency,120,130,,,,,,,100,110,140,150,110,120,,,
+TEST_J_BAD_ADJ,ATCGATCGATCG,J,GenBank,TEST003,1,100,150,+,,,Test J gene with bad adjacency,125,150,,,,,,,,,,,,,100,120,
