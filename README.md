@@ -32,13 +32,12 @@ The OGRDB submission process follows these steps:
 
 ```mermaid
 graph TD
-    A[Prepare sequences and genomic evidence] --> B[Create evidence file]
+    A[Gather sequences and genomic evidence] --> B[Create upload and evidence files]
     B --> C[check_evidence_file.py]
     C --> D{Evidence valid?}
     D -->|No| E[Fix errors in evidence file]
     E --> C
-    D -->|Yes| F[Create upload file]
-    F --> G[populate_upload.py]
+    D -->|Yes| G[populate_upload.py]
     G --> H[check_upload_file.py]
     H --> I{Upload valid?}
     I -->|No| J[Fix errors in upload file]
