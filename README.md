@@ -38,12 +38,12 @@ graph TD
     D -->|No| E[Fix errors in evidence file]
     E --> C
     D -->|Yes| F[Create upload file]
-    F --> G[transfer_evidence_to_upload.py]
+    F --> G[populate_upload.py]
     G --> H[check_upload_file.py]
     H --> I{Upload valid?}
     I -->|No| J[Fix errors in upload file]
     J --> H
-    I -->|Yes| K[Submit to OGRDB]
+    I -->|Yes| K[Upload files to OGRDB]
 ```
 
 ### Step-by-step Process
