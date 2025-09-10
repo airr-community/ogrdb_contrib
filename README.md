@@ -147,7 +147,7 @@ Coordinate fields are as described in the evidence file section, but coordinates
 
 | Value | Description |
 |-------|-------------|
-| `F` | Functional (no stop codons, proper reading frame) |
+| `F` | Functional (no stop codons, conserved residues, canonical flanking sequences are annotated (see [digger definition](https://williamdlees.github.io/digger/_build/html/tools/annotation.html#functionality))) |
 | `ORF` | Open reading frame (no stop codons in coding region) |
 | `P` | Pseudogene (contains stop codons or frameshifts) |
 
