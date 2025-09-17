@@ -53,31 +53,36 @@ Please ensure that fields do not contain leading or trailing spaces. The softwar
 
 1. **Prepare Upload File**: Populate `sequence_upload.csv` with allele details
 
-Make a copy of the provided template `sequence_upload_blank.csv`. Create a row in the upload file for each allele to be submitted. At this point, just fill in the following fields for each allele:
+Make a copy of the provided template `sequence_upload_blank.csv`. Create a row in the upload file for each allele to be submitted. Then fill in the following fields for each allele (definitions are provided in the table below):
+
+For all alleles:
 - `gene_label`
-- `imgt` (if applicable)
 - `functionality`
 - `type`
 - `inference_type`  
 - `sequence`
 - `sequence_gapped` (for V genes)
-- `species_subgroup` (if applicable)
-- `subgroup_type` (if applicable)
-- `alt_names` (if applicable)
-- `affirmation` (must be 1)
 - `chromosome` (if known)   
-- `notes` (if applicable)
-- `inferred_extension` (if applicable)
-- `ext_3_prime` (if applicable)
-- `ext_5_prime` (if applicable)
 - `j_codon_frame` (for J genes)
 - `j_cdr3_end` (for J genes)
+- `affirmation` (must be 1)
+
+Where applicable:
+- `imgt` 
+- `species_subgroup`
+- `subgroup_type`
+- `alt_names`
+- `notes`
+- `inferred_extension`
+- `ext_3_prime`
+- `ext_5_prime`
 
 Notes on the fields will be found in the table below.
 
 2. **Create Evidence File**: Populate `sequence_evidence_blank.csv` with genomic evidence details
 
-For each allele with an Unrearranged or Unrearranged and rearranged inference type, create one or more rows in the evidence file documenting the genomic evidence. Make a copy of the provided template `sequence_evidence_blank.csv`. Each row should include:
+Make a copy of the provided template `sequence_evidence_blank.csv`. For each allele with an `Unrearranged` or `Unrearranged and rearranged` inference type, create one or more rows in this file (the `evidence file`) documenting the genomic evidence. Each row should include:
+
 - `gene_label`
 - `sequence`
 - `sequence_type`
