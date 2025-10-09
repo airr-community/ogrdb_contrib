@@ -253,8 +253,8 @@ Transfers genomic evidence data from evidence files to upload files, with automa
 #### Usage
 
 ```bash
-# Transfer evidence data to upload file
-python transfer_evidence_to_upload.py evidence.csv upload.csv
+# Populate the upload file with evidence data
+python populate_upload.py evidence.csv upload.csv
 ```
 
 #### Features
