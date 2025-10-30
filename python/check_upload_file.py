@@ -12,6 +12,8 @@ from typing import Dict, List, Tuple
 
 from receptor_utils import simple_bio_seq as simple
 
+from populate_upload import find_best_evidence_match
+
 
 def basic_checks(upload_file) -> Tuple[bool, List[str]]:
     """
@@ -90,7 +92,7 @@ def validate_required_fields_upload(row: Dict, row_num: int) -> List[str]:
             elif field_name == 'sequence_gapped' and row['type'][:-1] != 'V':
                 continue
             else:
-                errors.append(f"Row {row_num}: Required field '{field_name}' is missing or empty")
+                errors.append(f"Upload file row {row_num}: Required field '{field_name}' is missing or empty")
                 continue
         
         # Type validation
@@ -103,15 +105,15 @@ def validate_required_fields_upload(row: Dict, row_num: int) -> List[str]:
         
         # Enum validation
         if enum_values and value not in enum_values:
-            errors.append(f"Row {row_num}: Invalid {field_name} '{value}'. Must be one of: {enum_values}")
+            errors.append(f"Upload file row {row_num}: Invalid {field_name} '{value}'. Must be one of: {enum_values}")
 
         if len(row['type']) != 4:
-            errors.append(f"Row {row_num}: Invalid type '{row['type']}'. Must be 4 characters like 'IGHV', 'IGHD', 'IGHJ', 'IGHC', etc.")
+            errors.append(f"Upload file row {row_num}: Invalid type '{row['type']}'. Must be 4 characters like 'IGHV', 'IGHD', 'IGHJ', 'IGHC', etc.")
         elif row['type'][3] not in ['V', 'D', 'J', 'C']:
-            errors.append(f"Row {row_num}: Invalid type '{row['type']}'. Final character must be one of V, D, J, C.")
+            errors.append(f"Upload file row {row_num}: Invalid type '{row['type']}'. Final character must be one of V, D, J, C.")
         elif row['type'][:3] not in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD']:
-            errors.append(f"Row {row_num}: Invalid type '{row['type']}'. Must start with one of IGH, IGK, IGL, TRA, TRB, TRG, TRD.")
-    
+            errors.append(f"Upload file row {row_num}: Invalid type '{row['type']}'. Must start with one of IGH, IGK, IGL, TRA, TRB, TRG, TRD.")
+
     return errors
 
 
@@ -170,7 +172,6 @@ def validate_coordinate_pairs_upload(row: Dict, row_num: int) -> List[str]:
     
     # Coordinate pairs to validate
     coordinate_pairs = [
-        ('start', 'end'),
         ('gene_start', 'gene_end'),
         ('utr_5_prime_start', 'utr_5_prime_end'),
         ('leader_1_start', 'leader_1_end'),
@@ -253,8 +254,6 @@ def validate_feature_adjacency_upload(row: Dict, row_num: int) -> List[str]:
             return None
     
     # Get coordinates
-    start = get_coord('start')
-    end = get_coord('end')
     gene_start = get_coord('gene_start')
     gene_end = get_coord('gene_end')
     features = []
@@ -335,17 +334,6 @@ def validate_feature_adjacency_upload(row: Dict, row_num: int) -> List[str]:
         if gene_start is not None and gene_end is not None:
             features.append(('gene', gene_start, gene_end))
     
-    # Validate that start/end span the entire annotated sequence
-    if features and start is not None and end is not None:
-        expected_start = min(feat[1] for feat in features)
-        expected_end = max(feat[2] for feat in features)
-        
-        if start != expected_start:
-            errors.append(f"Row {row_num}: start coordinate ({start}) should be {expected_start} (start of first feature)")
-        
-        if end != expected_end:
-            errors.append(f"Row {row_num}: end coordinate ({end}) should be {expected_end} (end of last feature)")
-    
     return errors
 
 
@@ -409,43 +397,7 @@ def validate_rearranged_only(row: Dict, row_num: int) -> List[str]:
     return errors
 
 
-def read_evidence_file_for_validation(evidence_path: str) -> Dict[str, Dict]:
-    """
-    Read evidence file for validation purposes.
-    
-    Args:
-        evidence_path: Path to evidence CSV file
-    
-    Returns:
-        Dictionary with keys as (gene_label, repository, accession, patch) tuples
-    """
-    evidence_dict = {}
-    
-    if not os.path.exists(evidence_path):
-        return evidence_dict
-    
-    try:
-        evidence_rows = simple.read_csv(evidence_path)
-        
-        for row in evidence_rows:
-            if not row['gene_label']:
-                continue
-                
-            gene_label = row['gene_label']
-            repository = row['repository']
-            accession = row['accession']
-            patch = row['patch']
-            
-            key = (gene_label, repository, accession, patch)
-            evidence_dict[key] = row
-            
-    except Exception as e:
-        print(f"Warning: Error reading evidence file: {e}")
-    
-    return evidence_dict
-
-
-def validate_against_evidence(row: Dict, row_num: int, evidence_dict: Dict) -> List[str]:
+def validate_against_evidence(row: Dict, row_num: int, evidence_rows: List[Dict]) -> List[str]:
     """
     Validate upload row against corresponding evidence file entry.
     
@@ -461,29 +413,16 @@ def validate_against_evidence(row: Dict, row_num: int, evidence_dict: Dict) -> L
     
     inference_type = row['inference_type']
     if inference_type == 'Rearranged only':
-        return errors  # Skip for rearranged only
-    
-    gene_label = row['gene_label']
-    repository = row['repository']
-    accession = row['accession']
-    patch = row['patch']
-    gene_type = row['type']
+        return errors  # Skip for rearranged only   
     
     # Look up evidence entry
-    evidence_key = (gene_label, repository, accession, patch)
-    if evidence_key not in evidence_dict:
-        errors.append(f"Row {row_num}: No matching evidence entry found for {evidence_key}")
+
+    evidence_row = find_best_evidence_match(row['gene_label'], evidence_rows)
+
+    if not evidence_row:
+        errors.append(f"Row {row_num}: No evidence entry found for gene_label '{row['gene_label']}'")
         return errors
-    
-    evidence_row = evidence_dict[evidence_key]
-    
-    # Check sequence matches
-    upload_sequence = row['sequence']
-    evidence_sequence = evidence_row['sequence']
-    
-    if upload_sequence != evidence_sequence:
-        errors.append(f"Row {row_num}: Sequence mismatch with evidence file for {gene_label}")
-    
+
     # Check that same features have coordinates and have equal lengths
     coordinate_pairs = [
         ('gene_start', 'gene_end'),
@@ -525,6 +464,7 @@ def validate_against_evidence(row: Dict, row_num: int, evidence_dict: Dict) -> L
                 pass
     
     # For J genes, check j_cdr3_end matches
+    gene_type = evidence_row['sequence_type']
     if gene_type == 'J':
         upload_cdr3_end = row['j_cdr3_end']
         evidence_cdr3_end = evidence_row['j_cdr3_end']
@@ -558,8 +498,8 @@ def check_upload_file(upload_path: str, evidence_path: str) -> Tuple[bool, List[
     errors = []
     
     # Read evidence file
-    evidence_dict = read_evidence_file_for_validation(evidence_path)
-    print(f"Loaded {len(evidence_dict)} evidence entries for validation")
+    evidence_rows = simple.read_csv(evidence_path)
+    print(f"Loaded {len(evidence_rows)} evidence entries for validation")
     
     # Read upload file
     if not os.path.exists(upload_path):
@@ -593,7 +533,7 @@ def check_upload_file(upload_path: str, evidence_path: str) -> Tuple[bool, List[
                 errors.extend(validate_v_gene_gapped_sequence(row, row_num))
                 
                 # Evidence file consistency validation
-                errors.extend(validate_against_evidence(row, row_num, evidence_dict))
+                errors.extend(validate_against_evidence(row, row_num, evidence_rows))
     
     except Exception as e:
         return False, [f"Error reading upload file: {e}"]
@@ -618,13 +558,10 @@ Examples:
   # 5. Consistency with evidence file data
         """
     )
-    
+    parser.add_argument('evidence_file',
+                        help='Path to the evidence CSV file')    
     parser.add_argument('upload_file',
                         help='Path to the upload CSV file to validate')
-    
-    parser.add_argument('evidence_file',
-                        help='Path to the evidence CSV file')
-    
     args = parser.parse_args()
     
     print(f"Evidence file: {args.evidence_file}")
@@ -645,7 +582,7 @@ Examples:
         return 0
     else:
         print("❌ Upload file validation FAILED")
-        print(f"\nFound {len(errors)} error(s):")
+        print(f"\nFound error(s):")
         for error in errors:
             print(f"  • {error}")
         return 1

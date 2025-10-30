@@ -143,21 +143,21 @@ def count_annotated_features(evidence_row: Dict) -> int:
     return feature_count
 
 
-def find_best_evidence_match(gene_label: str, evidence_dict: Dict) -> Dict:
+def find_best_evidence_match(gene_label: str, evidence_list: List[Dict]) -> Dict:
     """
     Find the best evidence record for a gene_label when repository/accession not specified.
     
     Args:
         gene_label: Gene label to search for
-        evidence_dict: Dictionary of all evidence records
+        evidence_list: List of all evidence records
     
     Returns:
         Best matching evidence record, or None if not found
     """
     # Find all evidence records for this gene_label
     matching_records = []
-    for (label, repo, acc, patch), evidence_row in evidence_dict.items():
-        if label == gene_label:
+    for evidence_row in evidence_list:
+        if evidence_row['gene_label'] == gene_label:
             matching_records.append(evidence_row)
     
     if len(matching_records) == 0:
@@ -180,53 +180,30 @@ def find_best_evidence_match(gene_label: str, evidence_dict: Dict) -> Dict:
 
 def read_evidence_file(evidence_path: str) -> Dict[str, Dict]:
     """
-    Read evidence file and create lookup dictionary.
+    Read evidence file into a list of rows
     
     Args:
         evidence_path: Path to evidence CSV file
     
     Returns:
-        Dictionary with keys as (gene_label, repository, accession, patch) tuples
-        and values as evidence row dictionaries
+        List of rows from the evidence file
     """
-    evidence_dict = {}
+    evidence_list = []
     
     if not os.path.exists(evidence_path):
         raise FileNotFoundError(f"Evidence file not found: {evidence_path}")
     
-    try:
-        evidence_rows = simple.read_csv(evidence_path)
-        
-        for row in evidence_rows:
-            # Skip empty rows
-            if not row['gene_label']:
-                continue
-                
-            gene_label = row['gene_label']
-            repository = row['repository']
-            accession = row['accession']
-            patch = row['patch']
-            
-            key = (gene_label, repository, accession, patch)
-            
-            if key in evidence_dict:
-                print(f"Warning: Duplicate evidence entry found for {key}")
-            
-            evidence_dict[key] = row
-            
-    except Exception as e:
-        raise ValueError(f"Error reading evidence file: {e}")
-    
-    return evidence_dict
+    evidence_list = simple.read_csv(evidence_path)
+
+    return evidence_list
 
 
-def transform_coordinates(evidence_row: Dict, sequence_type: str) -> Dict[str, str]:
+def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
     """
     Transform coordinates from genomic assembly coordinates to sequence-relative coordinates.
     
     Args:
         evidence_row: Evidence file row dictionary
-        sequence_type: V, D, J, or C
     
     Returns:
         Dictionary of transformed coordinate fields
@@ -257,6 +234,7 @@ def transform_coordinates(evidence_row: Dict, sequence_type: str) -> Dict[str, s
     gene_end = get_coord('gene_end')
     if gene_start is not None and gene_end is not None:
         features.append(('gene', gene_start, gene_end))
+    sequence_type = evidence_row['sequence_type']
     
     if sequence_type == 'V':
         # V-specific features
@@ -355,10 +333,6 @@ def transform_coordinates(evidence_row: Dict, sequence_type: str) -> Dict[str, s
         # Move to next position
         p += feature_length
     
-    # Set overall sequence coordinates
-    transformed['start'] = '1'
-    transformed['end'] = str(p - 1)
-    
     return transformed
 
 
@@ -401,8 +375,8 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
     
     # Read evidence file
     try:
-        evidence_dict = read_evidence_file(evidence_path)
-        print(f"Loaded {len(evidence_dict)} evidence entries")
+        evidence_list = read_evidence_file(evidence_path)
+        print(f"Loaded {len(evidence_list)} evidence entries")
     except Exception as e:
         return False, [str(e)]
     
@@ -430,6 +404,12 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
         inference_type = upload_row['inference_type']
         
         print(f"Processing row {row_num}: {gene_label} ({inference_type})")
+
+        # Check inference type is valid
+        if inference_type not in ['Unrearranged', 'Unrearranged and rearranged', 'Rearranged']:
+            errors.append(f"Upload file row {row_num}: Invalid inference_type '{inference_type}: permitted values are 'Unrearranged', 'Unrearranged and rearranged', or 'Rearranged'")
+            updated_rows.append(upload_row)
+            continue
         
         # Only process genomic inference types
         if inference_type not in ['Unrearranged', 'Unrearranged and rearranged']:
@@ -437,54 +417,13 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
             updated_rows.append(upload_row)
             continue
         
-        # Check required fields - but allow automatic lookup if missing
-        repository = upload_row['repository']
-        accession = upload_row['accession']
-        
-        evidence_row = None
-        evidence_source = "exact match"
-        
-        if repository and accession:
-            # Repository and accession specified - do exact lookup
-            patch = upload_row['patch']
-            evidence_key = (gene_label, repository, accession, patch)
-            
-            if evidence_key not in evidence_dict:
-                errors.append(f"Row {row_num}: No matching evidence entry found for {evidence_key}")
-                updated_rows.append(upload_row)
-                continue
-            
-            evidence_row = evidence_dict[evidence_key]
-        
-        elif not repository and not accession:
-            # Neither specified - find best match by gene_label
-            evidence_row = find_best_evidence_match(gene_label, evidence_dict)
-            evidence_source = "automatic best match"
-            
-            if evidence_row is None:
-                errors.append(f"Row {row_num}: No evidence records found for gene_label '{gene_label}'")
-                updated_rows.append(upload_row)
-                continue
-            
-            # Update upload row with found repository/accession info
-            upload_row['repository'] = evidence_row['repository']
-            upload_row['accession'] = evidence_row['accession']
-            upload_row['patch'] = evidence_row['patch']
-            
-        else:
-            # Only one of repository/accession specified - this is an error
-            missing_field = 'accession' if repository else 'repository'
-            errors.append(f"Row {row_num}: {missing_field} field is blank but repository/accession should be specified together for genomic inference type")
+        evidence_row = find_best_evidence_match(gene_label, evidence_list)
+
+        if evidence_row is None:
+            errors.append(f"Upload file row {row_num}: No evidence found for gene_label '{gene_label}'")
             updated_rows.append(upload_row)
             continue
-        
-        # Get sequence type
-        sequence_type = evidence_row['sequence_type']
-        if not sequence_type:
-            errors.append(f"Row {row_num}: sequence_type not specified in evidence file")
-            updated_rows.append(upload_row)
-            continue
-        
+
         # Transfer sequence
         evidence_sequence = evidence_row['sequence']
         if evidence_sequence:
@@ -492,7 +431,7 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
         
         # Transform and transfer coordinates
         try:
-            transformed_coords = transform_coordinates(evidence_row, sequence_type)
+            transformed_coords = transform_coordinates(evidence_row)
             
             # Update upload row with transformed coordinates
             for coord_field, coord_value in transformed_coords.items():
@@ -500,10 +439,10 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
                     upload_row[coord_field] = coord_value
             
             updates_made += 1
-            print(f"  ✅ Updated {gene_label} with genomic evidence ({evidence_source})")
+            print(f"  ✅ Updated {gene_label} with genomic evidence ({evidence_row['repository']} / {evidence_row['accession']})")
             
         except Exception as e:
-            errors.append(f"Row {row_num}: Error transforming coordinates for {gene_label}: {e}")
+            errors.append(f"Upload file row {row_num}: Error transforming evidence coordinates for {gene_label}: {e}")
         
         updated_rows.append(upload_row)
     
