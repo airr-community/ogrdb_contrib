@@ -146,10 +146,10 @@ def validate_v_gene_gapped_sequence(row: Dict, row_num: int) -> List[str]:
         return errors
     
     # Check that removing periods gives the same sequence as 'sequence'
-    ungapped_sequence = sequence_gapped.replace('.', '')
+    ungapped_sequence = sequence_gapped.replace('.', '').upper()
     start = int(row['gene_start'])
     end = int(row['gene_end'])
-    if sequence and ungapped_sequence != sequence[start-1:end]:
+    if sequence and ungapped_sequence != sequence[start-1:end].upper():
         errors.append(f"Row {row_num}: V gene sequence_gapped without periods does not match sequence field")
         errors.append(f"  Expected: {sequence[start-1:end]}")
         errors.append(f"  Got: {ungapped_sequence}")
