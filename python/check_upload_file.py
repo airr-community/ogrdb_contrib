@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple
 from receptor_utils import simple_bio_seq as simple
 
 from populate_upload import find_best_evidence_match
+from check_evidence_file import check_c_exons
 
 
 def basic_checks(upload_file) -> Tuple[bool, List[str]]:
@@ -30,7 +31,11 @@ def basic_checks(upload_file) -> Tuple[bool, List[str]]:
         'gene_label', 'imgt', 'functionality', 'type', 'inference_type', 'sequence', 'sequence_gapped', 'species_subgroup', 'subgroup_type', 'alt_names',
         'affirmation', 'chromosome', 'paralogs', 'varb_rep', 'notes', 'inferred_extension', 'ext_3_prime', 'ext_5_prime', 'curational_tags', 'mapped',
         'gene_start', 'gene_end', 'utr_5_prime_start', 'utr_5_prime_end', 'leader_1_start', 'leader_1_end', 'leader_2_start', 'leader_2_end', 
-        'v_rs_start', 'v_rs_end', 'd_rs_3_prime_start', 'd_rs_3_prime_end', 'd_rs_5_prime_start', 'd_rs_5_prime_end', 'j_codon_frame', 'j_rs_start', 'j_rs_end', 'j_cdr3_end'
+        'v_rs_start', 'v_rs_end', 'd_rs_3_prime_start', 'd_rs_3_prime_end', 'd_rs_5_prime_start', 'd_rs_5_prime_end', 'j_codon_frame', 'j_rs_start', 'j_rs_end', 'j_cdr3_end',
+        "c_exon_1_start", "c_exon_1_end", "c_exon_2_start", "c_exon_2_end", "c_exon_3_start",
+        "c_exon_3_end", "c_exon_4_start", "c_exon_4_end", "c_exon_5_start", "c_exon_5_end",
+        "c_exon_6_start", "c_exon_6_end", "c_exon_7_start", "c_exon_7_end", "c_exon_8_start", "c_exon_8_end",
+        "c_exon_9_start", "c_exon_9_end", "utr_3_prime_start", "utr_3_prime_end", "c_tm_sequence", "c_sc_sequence"
     ]
 
     # Check if file exists
@@ -179,7 +184,17 @@ def validate_coordinate_pairs_upload(row: Dict, row_num: int) -> List[str]:
         ('v_rs_start', 'v_rs_end'),
         ('d_rs_3_prime_start', 'd_rs_3_prime_end'),
         ('d_rs_5_prime_start', 'd_rs_5_prime_end'),
-        ('j_rs_start', 'j_rs_end')
+        ('j_rs_start', 'j_rs_end'),
+        ('c_exon_1_start', 'c_exon_1_end'),
+        ('c_exon_2_start', 'c_exon_2_end'),
+        ('c_exon_3_start', 'c_exon_3_end'),
+        ('c_exon_4_start', 'c_exon_4_end'),
+        ('c_exon_5_start', 'c_exon_5_end'),
+        ('c_exon_6_start', 'c_exon_6_end'),
+        ('c_exon_7_start', 'c_exon_7_end'),
+        ('c_exon_8_start', 'c_exon_8_end'),
+        ('c_exon_9_start', 'c_exon_9_end'),
+        ('utr_3_prime_start', 'utr_3_prime_end')
     ]
     
     for start_field, end_field in coordinate_pairs:
@@ -334,6 +349,11 @@ def validate_feature_adjacency_upload(row: Dict, row_num: int) -> List[str]:
         if gene_start is not None and gene_end is not None:
             features.append(('gene', gene_start, gene_end))
     
+    elif sequence_type == 'C':
+        c_errors = (check_c_exons(row, '+'))
+        c_errors = [f'Row {row_num}: {r[1]}' for r in c_errors]
+        errors.extend(c_errors)
+
     return errors
 
 
@@ -432,7 +452,17 @@ def validate_against_evidence(row: Dict, row_num: int, evidence_rows: List[Dict]
         ('v_rs_start', 'v_rs_end'),
         ('d_rs_3_prime_start', 'd_rs_3_prime_end'),
         ('d_rs_5_prime_start', 'd_rs_5_prime_end'),
-        ('j_rs_start', 'j_rs_end')
+        ('j_rs_start', 'j_rs_end'),
+        ('c_exon_1_start', 'c_exon_1_end'),
+        ('c_exon_2_start', 'c_exon_2_end'),
+        ('c_exon_3_start', 'c_exon_3_end'),
+        ('c_exon_4_start', 'c_exon_4_end'),
+        ('c_exon_5_start', 'c_exon_5_end'),
+        ('c_exon_6_start', 'c_exon_6_end'),
+        ('c_exon_7_start', 'c_exon_7_end'),
+        ('c_exon_8_start', 'c_exon_8_end'),
+        ('c_exon_9_start', 'c_exon_9_end'),
+        ('utr_3_prime_start', 'utr_3_prime_end')
     ]
     
     for start_field, end_field in coordinate_pairs:

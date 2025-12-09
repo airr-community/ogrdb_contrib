@@ -35,7 +35,11 @@ def basic_checks(evidence_file) -> Tuple[bool, List[str]]:
         'd_rs_3_prime_start', 'd_rs_3_prime_end',
         'd_rs_5_prime_start', 'd_rs_5_prime_end',
         'j_rs_start', 'j_rs_end',
-        'j_codon_frame', 'j_cdr3_end'
+        'j_codon_frame', 'j_cdr3_end',
+        "c_exon_1_start", "c_exon_1_end", "c_exon_2_start", "c_exon_2_end", "c_exon_3_start",
+        "c_exon_3_end", "c_exon_4_start", "c_exon_4_end", "c_exon_5_start", "c_exon_5_end",
+        "c_exon_6_start", "c_exon_6_end", "c_exon_7_start", "c_exon_7_end", "c_exon_8_start", "c_exon_8_end",
+        "c_exon_9_start", "c_exon_9_end", "utr_3_prime_start", "utr_3_prime_end", "c_tm_sequence", "c_sc_sequence"
     ]
 
     # Check if file exists
@@ -163,7 +167,7 @@ def validate_enumerated_fields(row: Dict, row_num: int) -> List[str]:
         errors.append(f"Row {row_num}: Invalid sequence_type '{sequence_type}'. Must be one of: {valid_sequence_types}")
     
     # Validate sense
-    valid_senses = ['+', '-', 'plus', 'minus']
+    valid_senses = ['+', '-']
     sense = row['sense']
     if sense and sense not in valid_senses:
         errors.append(f"Row {row_num}: Invalid sense '{sense}'. Must be one of: {valid_senses}")
@@ -194,7 +198,17 @@ def validate_coordinates(row: Dict, row_num: int) -> List[str]:
         ('v_rs_start', 'v_rs_end'),
         ('d_rs_3_prime_start', 'd_rs_3_prime_end'),
         ('d_rs_5_prime_start', 'd_rs_5_prime_end'),
-        ('j_rs_start', 'j_rs_end')
+        ('j_rs_start', 'j_rs_end'),
+        ('c_exon_1_start', 'c_exon_1_end'),
+        ('c_exon_2_start', 'c_exon_2_end'),
+        ('c_exon_3_start', 'c_exon_3_end'),
+        ('c_exon_4_start', 'c_exon_4_end'),
+        ('c_exon_5_start', 'c_exon_5_end'),
+        ('c_exon_6_start', 'c_exon_6_end'),
+        ('c_exon_7_start', 'c_exon_7_end'),
+        ('c_exon_8_start', 'c_exon_8_end'),
+        ('c_exon_9_start', 'c_exon_9_end'),
+        ('utr_3_prime_start', 'utr_3_prime_end')
     ]
     
     for start_field, end_field in coordinate_pairs:
@@ -249,11 +263,13 @@ def validate_adjacency(row: Dict, row_num: int) -> List[str]:
                leader_1/2 -> gene -> v_rs (all adjacent)
       D genes: d_rs_5 -> gene -> d_rs_3 (all adjacent)
       J genes: j_rs -> gene (adjacent)
+      C genes: c_exon_1 -> c_exon_2 -> ... -> c_exon_9 (gap allowed, null coordinates allowed)
     
     For - sense: functional order is reversed but genomic coordinates still start < end
       V genes: v_rs -> gene -> leader_2/1 -> leader_1 -> utr_5 (all adjacent except gap allowed)
       D genes: d_rs_3 -> gene -> d_rs_5 (all adjacent)
       J genes: gene -> j_rs (adjacent)
+      C genes: c_exon_9 -> ... -> c_exon_2 -> c_exon_1 (gap allowed, null coordinates allowed)
     
     Also validates that start/end coordinates span the entire annotated sequence.
     
@@ -471,6 +487,22 @@ def validate_adjacency(row: Dict, row_num: int) -> List[str]:
                 
                 if gene_end is not None and j_rs_start != gene_end + 1:
                     errors.append(f"Row {row_num}: j_rs_start ({j_rs_start}) should be adjacent to gene_end + 1 ({gene_end + 1})")
+
+    elif sequence_type == 'C':
+        # C gene exon adjacency validation
+        c_exon_errors = check_c_exons(row, sense)
+        for field, message in c_exon_errors:
+            errors.append(f"Row {row_num}: {message}")
+        
+        # Collect features for span validation
+        features = []
+        for i in range(1, 10):
+            start_field = f'c_exon_{i}_start'
+            end_field = f'c_exon_{i}_end'
+            start_coord = get_coord(start_field)
+            end_coord = get_coord(end_field)
+            if start_coord is not None and end_coord is not None:
+                features.append((f'c_exon_{i}', start_coord, end_coord))
     
     # Validate that start/end span the entire annotated sequence
     if features and start is not None and end is not None:
@@ -554,8 +586,87 @@ def validate_sequence_match(row: Dict, row_num: int, genomic_sequence: str) -> L
     return errors
 
 
-def check_evidence_file(filepath: str, use_genbank: bool = True, email: str = "user@example.com",
-                        save_sequences: bool = False) -> Tuple[bool, List[str]]:
+def check_c_exons(gene_description, sense):
+    """
+    Validate C-gene exon coordinates.
+    
+    Returns a list of error messages. An empty list indicates no errors.
+    
+    Rules:
+    - For each exon (c_exon_1 to c_exon_8), start and end should either both be null or both be positive integers
+    - If both are provided, end must be > start
+    - If any exon coordinates are null, all successive exon coordinates must also be null
+    - Successive exons must have coordinates higher than the previous exon (+ sense)
+    - c_exon_1 should never be null
+    """
+    errors = []
+    
+    # Check c_exon_1 is not null
+    if gene_description['c_exon_1_start'] is None or gene_description['c_exon_1_end'] is None:
+        errors.append(("c_exon_1_start", "C-gene exon 1 coordinates cannot be null"))
+        return errors  # No point checking further if exon 1 is null
+    
+    # Check all 8 exons
+    found_null = False
+    if sense == '+':
+        last_end = -1
+    else:
+        last_end = sys.maxsize
+    
+    for i in range(1, 9):
+        start_attr = f'c_exon_{i}_start'
+        end_attr = f'c_exon_{i}_end'
+        
+        start = gene_description.get(start_attr, None)
+        end = gene_description.get(end_attr, None)
+        
+        # Check that both are null or both are not null
+        if (not start) != (not end):
+            errors.append((f"c_exon_{i}_start", f"Exon c_exon_{i}: start and end must both be null or both be provided"))
+            continue
+        
+        # If both are null
+        if (not start) and (not end):
+            found_null = True
+            continue
+        
+        # If we previously found a null exon, current exon should also be null
+        if found_null:
+            errors.append((f"c_exon_{i}_start", f"Exon c_exon_{i}: coordinates must be null because a previous exon has null coordinates"))
+            continue
+
+        try:
+            start = int(start)
+            end = int(end)
+        except ValueError:
+            errors.append((f"c_exon_{i}_start", f"Exon c_exon_{i}: start and end must be integers"))
+            continue
+        
+        # Check that both are positive integers
+        if start <= 0:
+            errors.append((f"c_exon_{i}_start", f"Exon c_exon_{i}: start coordinate must be a positive integer"))
+        if end <= 0:
+            errors.append((f"c_exon_{i}_end", f"Exon c_exon_{i}: end coordinate must be a positive integer"))
+        
+        # Check that end > start
+        if end <= start:
+            errors.append((f"c_exon_{i}_end", f"Exon c_exon_{i}: end coordinate must be greater than start coordinate"))
+        
+        # Check that this exon's coordinates are higher than the previous exon
+        if sense == '+':
+            if start <= last_end:
+                errors.append((f"c_exon_{i}_start", f"Exon c_exon_{i}: start coordinate must be greater than the previous exon's end coordinate"))
+        else:
+            if start >= last_end:
+                errors.append((f"c_exon_{i}_start", f"Exon c_exon_{i}: start coordinate must be less than the previous exon's end coordinate (-ve sense sequence)"))
+        
+        last_end = end
+    
+    return errors
+
+
+def check_evidence_file(filepath: str, use_genbank: bool, email: str,
+                        save_sequences: bool, skip_sequence_validation: bool) -> Tuple[bool, List[str]]:
     """
     Check the evidence file for errors.
     
@@ -564,6 +675,7 @@ def check_evidence_file(filepath: str, use_genbank: bool = True, email: str = "u
         use_genbank: If True, download sequences from GenBank; if False, read from local files
         email: Email address for GenBank queries
         save_sequences: If True and using GenBank, save sequences to FASTA files
+        skip_sequence_validation: If True, skip sequence validation step
     
     Returns:
         Tuple of (success, list_of_errors)
@@ -598,7 +710,7 @@ def check_evidence_file(filepath: str, use_genbank: bool = True, email: str = "u
                 errors.extend(validate_adjacency(row, row_num))
                 
                 # Skip sequence validation if basic validation failed
-                if any(f"Row {row_num}:" in error for error in errors[-10:]):  # Check recent errors
+                if skip_sequence_validation or any(f"Row {row_num}:" in error for error in errors[-10:]):  # Check recent errors
                     continue
                 
                 # Get genomic sequence
@@ -660,6 +772,9 @@ Examples:
     parser.add_argument('--save-sequences', action='store_true',
                         help='Save downloaded GenBank sequences to FASTA files in current directory')
     
+    parser.add_argument('--skip-sequence-validation', action='store_true',
+                        help='Skip GenBank sequence validation')
+    
     args = parser.parse_args()
     
     # Validate arguments
@@ -673,6 +788,10 @@ Examples:
         print("Will save downloaded sequences to FASTA files")
     print()
 
+    if args.skip_sequence_validation and args.save_sequences:
+        print("Error: saving sequences is incompatible with skipping sequence validation.")
+        return 1
+
     success, errors = basic_checks(args.evidence_file)
 
     if not success:
@@ -683,9 +802,10 @@ Examples:
     
     success, errors = check_evidence_file(
         args.evidence_file,
-        use_genbank=not args.use_local,
-        email=args.email,
-        save_sequences=args.save_sequences
+        not args.use_local,
+        args.email,
+        args.save_sequences,
+        args.skip_sequence_validation
     )
     
     if success:

@@ -281,6 +281,14 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
         if j_cdr3_end is not None:
             transformed['j_cdr3_end'] = str(j_cdr3_end)
     
+    elif sequence_type == 'C':
+        # C-specific features (c_exons)
+        for i in range(1, 10):
+            exon_start = get_coord(f'c_exon_{i}_start')
+            exon_end = get_coord(f'c_exon_{i}_end')
+            if exon_start is not None and exon_end is not None:
+                features.append((f'c_exon_{i}', exon_start, exon_end))
+    
     if not features:
         return transformed
     
@@ -305,34 +313,49 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
         feature_length = feat_end - feat_start + 1
         
         # Set the transformed start and end coordinates
-        if feature_name == 'gene':
-            transformed['gene_start'] = str(p)
-            transformed['gene_end'] = str(p + feature_length - 1)
-        elif feature_name == 'utr_5_prime':
-            transformed['utr_5_prime_start'] = str(p)
-            transformed['utr_5_prime_end'] = str(p + feature_length - 1)
-        elif feature_name == 'leader_1':
-            transformed['leader_1_start'] = str(p)
-            transformed['leader_1_end'] = str(p + feature_length - 1)
-        elif feature_name == 'leader_2':
-            transformed['leader_2_start'] = str(p)
-            transformed['leader_2_end'] = str(p + feature_length - 1)
-        elif feature_name == 'v_rs':
-            transformed['v_rs_start'] = str(p)
-            transformed['v_rs_end'] = str(p + feature_length - 1)
-        elif feature_name == 'd_rs_5_prime':
-            transformed['d_rs_5_prime_start'] = str(p)
-            transformed['d_rs_5_prime_end'] = str(p + feature_length - 1)
-        elif feature_name == 'd_rs_3_prime':
-            transformed['d_rs_3_prime_start'] = str(p)
-            transformed['d_rs_3_prime_end'] = str(p + feature_length - 1)
-        elif feature_name == 'j_rs':
-            transformed['j_rs_start'] = str(p)
-            transformed['j_rs_end'] = str(p + feature_length - 1)
-        
-        # Move to next position
-        p += feature_length
-    
+        if sequence_type != 'C':
+            if feature_name == 'gene':
+                transformed['gene_start'] = str(p)
+                transformed['gene_end'] = str(p + feature_length - 1)
+            elif feature_name == 'utr_5_prime':
+                transformed['utr_5_prime_start'] = str(p)
+                transformed['utr_5_prime_end'] = str(p + feature_length - 1)
+            elif feature_name == 'leader_1':
+                transformed['leader_1_start'] = str(p)
+                transformed['leader_1_end'] = str(p + feature_length - 1)
+            elif feature_name == 'leader_2':
+                transformed['leader_2_start'] = str(p)
+                transformed['leader_2_end'] = str(p + feature_length - 1)
+            elif feature_name == 'v_rs':
+                transformed['v_rs_start'] = str(p)
+                transformed['v_rs_end'] = str(p + feature_length - 1)
+            elif feature_name == 'd_rs_5_prime':
+                transformed['d_rs_5_prime_start'] = str(p)
+                transformed['d_rs_5_prime_end'] = str(p + feature_length - 1)
+            elif feature_name == 'd_rs_3_prime':
+                transformed['d_rs_3_prime_start'] = str(p)
+                transformed['d_rs_3_prime_end'] = str(p + feature_length - 1)
+            elif feature_name == 'j_rs':
+                transformed['j_rs_start'] = str(p)
+                transformed['j_rs_end'] = str(p + feature_length - 1)
+            # Move to next position
+            p += feature_length
+        else:
+            if feature_name == 'gene':
+                transformed['gene_start'] = 1
+                transformed['gene_end'] = gene_end - gene_start + 1
+            elif feature_name.startswith('c_exon_'):
+                if sense in ['+', 'plus']:
+                    transformed[f'{feature_name}_start'] = feat_start - gene_start + 1
+                    transformed[f'{feature_name}_end'] = feat_end - gene_start + 1
+                else:
+                    transformed[f'{feature_name}_end'] = (gene_end - gene_start + 1) - (feat_start - gene_start)
+                    transformed[f'{feature_name}_start'] = (gene_end - gene_start + 1) - (feat_end - gene_start)
+
+    if sequence_type == 'C':
+        transformed['c_sc_sequence'] = evidence_row['c_sc_sequence']
+        transformed['c_tm_sequence'] = evidence_row['c_tm_sequence']
+
     return transformed
 
 

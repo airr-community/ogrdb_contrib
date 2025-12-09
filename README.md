@@ -2,7 +2,7 @@
 
 This repository provides tools for creating and validating sequence submission files for the [Open Germline Receptor Database (OGRDB)](https://ogrdb.airr-community.org/). The tools help researchers prepare genomic evidence and sequence upload files that meet OGRDB's requirements.
 
-Uploading sequences is the first step in creating or updating germline sets. Once the sequences are uploaded, they can be grouped into sets using tools in OGRDB itself. The sequence upload consists of two CSV files. One holds information on the sequences theselves (the upload file), and the other documents the genomic evidence supporting each sequence (the evidence file). Germline sets on OGRDB hold to different standards, depending on the available evidence for the species in question. Genomic evidence is not required for all species, or for all sequences in a submission, but it is strongly preferred and should be provided if available.
+Uploading sequences is the first step in creating or updating germline sets. Once the sequences are uploaded, they can be grouped into sets using tools in OGRDB itself. The sequence upload consists of two CSV files. One holds information on the sequences (the upload file), and the other documents the genomic evidence supporting each sequence (the evidence file). Germline sets on OGRDB hold to different standards, depending on the available evidence for the species in question. Genomic evidence is not required for all species, or for all sequences in a submission, but it is strongly preferred and should be provided if available. Please consult the maintainers before preparing any files, to make sure that the submission meets the current requirements for the species in question.
 
 ## Prerequisites
 
@@ -10,10 +10,10 @@ Before using these tools, you need:
 
 1. **A set of allele sequences** with assigned names
 2. **Gapped sequences for V alleles** (IMGT-gapped format. See notes on gapping at the end of this document)
-3. **Genomic evidence** for alleles with genomic inference type, including:
+3. **Genomic evidence** for alleles with genomic inference type: this consists of genomic sequencing, deposited in a repository of record. It includes:
    - Repository accession numbers (preferably GenBank)
    - Precise coordinates of each sequence within genomic records
-   - GenBank records are preferred as they can be more easily verified.
+   GenBank records are preferred as they can be verified by the code.
 
 ## Required Software Dependencies
 
@@ -53,7 +53,7 @@ Please ensure that fields do not contain leading or trailing spaces. The softwar
 
 1. **Prepare Upload File**: Populate `sequence_upload.csv` with allele details
 
-Make a copy of the provided template `sequence_upload_blank.csv`. Create a row in the upload file for each allele to be submitted. Then fill in the following fields for each allele (definitions are provided in the table below):
+Make a copy of the provided template `templates/sequence_upload_blank.csv`. Create a row in the upload file for each allele to be submitted. Then fill in the following fields for each allele (definitions are provided in the table below):
 
 For all alleles:
 - `gene_label`
@@ -67,6 +67,11 @@ For all alleles:
 - `j_cdr3_end` (for J genes)
 - `affirmation` (must be 1)
 
+- For J genes, `j_codon_frame` and `j_cdr3_end` must also be completed. The [receptor-utils](https://github.com/williamdlees/receptor_utils) tool `annot_j` can be used to determine `j_codon_frame` and `j_cdr3_end` values.
+- For C genes, the transmembrane sequence should be put in `sequence`, `gene_start` should be 1 and `gene_end` should be the length of `sequence`.
+- For IG heavy chain C genes, if the secretory domain sequence is available, it should be put in the `c_sc_sequence` field.
+- For other fields, see notes in the table below.
+
 Where applicable:
 - `imgt` 
 - `species_subgroup`
@@ -79,9 +84,10 @@ Where applicable:
 
 Notes on the fields will be found in the table below.
 
-2. **Create Evidence File**: Populate `sequence_evidence_blank.csv` with genomic evidence details
+2. **Create Evidence File**: Populate `sequence_evidence_blank.csv` with genomic sequence details for those alleles for which you have it. If you have no genomic evidence to provide, skip to step 5.
 
-Make a copy of the provided template `sequence_evidence_blank.csv`. For each allele with an `Unrearranged` or `Unrearranged and rearranged` inference type, create one or more rows in this file (the `evidence file`) documenting the genomic evidence. Each row should include:
+Make a copy of the provided template `templates/sequence_evidence_blank.csv`. For each allele with an `Unrearranged` or `Unrearranged and rearranged` inference type, create one or more rows in this file (the `evidence file`) documenting the genomic evidence. 
+Create one row for each separate piece of evidence you have: there an be more than one row for an allele. Each row should include:
 
 - `gene_label`
 - `sequence`
@@ -100,11 +106,28 @@ Make a copy of the provided template `sequence_evidence_blank.csv`. For each all
 
 3. **Validate Evidence**: Run `check_evidence_file.py` to verify evidence file
 
-This will verify that the evidence file is complete and consistent with the genomic sequences. It checks required fields, coordinate validity, feature adjacency, and sequence matching. Fix any reported errors before proceeding.
+This will verify that the evidence file is complete and consistent with the genomic sequences. It checks required fields, coordinate validity, feature adjacency, and sequence matching. Fix any reported errors before proceeding. If you referenced Genbank accessions,
+the script can download the sequences automatically. Otherwise you can provide local FASTA files.
 
 4. **Populate Upload File**: Run `populate_upload_file.py`
 
-This will select evidence from the evidence file and populate the upload file with sequences and coordinates. It will check that evidence is available for all alleles. The script also creates coordinates in the upload file for sequences with rearranged-only inference type. Fix any reported errors before proceeding.
+This will select evidence from the evidence file and populate the upload file with sequences and coordinates. It will check that evidence is available for all alleles marked as `Unrearranged` or `Unrearranged and rearranged`. The script also creates coordinates in the upload file for sequences with rearranged-only inference type. Fix any reported errors before proceeding.
+
+5. **Complete Upload File**: Add details for any sequences with rearranged-only inference type
+
+For alleles with `Rearranged only` inference type, complete the upload file by adding:
+- `sequence`
+- `sequence_gapped` (for V genes)
+- `gene_start`
+- `gene_end`
+
+Typically, `sequence` will just be the sequence of the core coding region (V-, D-, J- or C-REGION). In this case `gene_start` will be 1 and `gene_end` will be the length of the sequence. If you do have additional sequence (e.g., UTRs, leader sequences), you can include coordinates for these as well. `gene_start` and `gene_end` coordinates should indicate the core coding region within the larger sequence.
+
+As in the evidence file, the following additional notes apply:
+
+- For J genes, `j_codon_frame` and `j_cdr3_end` must also be completed. The [receptor-utils](https://github.com/williamdlees/receptor_utils) tool `annot_j` can be used to determine `j_codon_frame` and `j_cdr3_end` values.
+- For C genes, the transmembrane sequence should be put in `sequence`, `gene_start` should be 1 and `gene_end` should be the length of `sequence`.
+- For IG heavy chain C genes, if the secretory domain sequence is available, it should be put in the `c_sc_sequence` field.
 
 5. **Validate Upload**: Run `check_upload_file.py` to verify upload file completeness
 6. **Upload**: Upload validated files to OGRDB
@@ -201,6 +224,28 @@ The evidence file documents genomic evidence for each allele. Each row represent
 | `j_rs_start` | Integer | Optional | ≥1 | Start of J recombination signal |
 | `j_rs_end` | Integer | Optional | >j_rs_start | End of J recombination signal |
 | `j_cdr3_end` | Integer | Optional | ≥1 | End of CDR3 region (WGG/FGG motif) |
+| `c_exon_1_start` | Integer | Optional | ≥1 | Start of constant region exon 1 |
+| `c_exon_1_end` | Integer | Optional | ≥1 | End of constant region exon 1 |
+| `c_exon_2_start` | Integer | Optional | ≥1 | Start of constant region exon 2 |
+| `c_exon_2_end` | Integer | Optional | ≥1 | End of constant region exon 2 |
+| `c_exon_3_start` | Integer | Optional | ≥1 | Start of constant region exon 3 |
+| `c_exon_3_end` | Integer | Optional | ≥1 | End of constant region exon 3 |
+| `c_exon_4_start` | Integer | Optional | ≥1 | Start of constant region exon 4 |
+| `c_exon_4_end` | Integer | Optional | ≥1 | End of constant region exon 4 |
+| `c_exon_5_start` | Integer | Optional | ≥1 | Start of constant region exon 5 |
+| `c_exon_5_end` | Integer | Optional | ≥1 | End of constant region exon 5 |
+| `c_exon_6_start` | Integer | Optional | ≥1 | Start of constant region exon 5 |
+| `c_exon_6_end` | Integer | Optional | ≥1 | End of constant region exon 6 |
+| `c_exon_7_start` | Integer | Optional | ≥1 | Start of constant region exon 7 |
+| `c_exon_7_end` | Integer | Optional | ≥1 | End of constant region exon 7 |
+| `c_exon_8_start` | Integer | Optional | ≥1 | Start of constant region exon 8 |
+| `c_exon_8_end` | Integer | Optional | ≥1 | End of constant region exon 8 |
+| `c_exon_9_start` | Integer | Optional | ≥1 | Start of constant region exon 9 |
+| `c_exon_9_end` | Integer | Optional | ≥1 | End of constant region exon 9 |
+| `c_sc_sequence` | String | Optional | DNA sequence | constant region IG heavy chain secretory domain sequence |
+| `utr_3_prime_start` | Integer | Optional | ≥1 | Start of 3' UTR |
+| `utr_3_prime_end` | Integer | Optional | >utr_3_prime_start | End of 3' UTR |
+
 
 #### Coordinate Requirements
 
@@ -246,7 +291,7 @@ python check_evidence_file.py evidence.csv --email your@email.com --save-sequenc
 
 When using `--use-local`, the script expects FASTA files named `<accession>.fasta` in the current directory.
 
-### `transfer_evidence_to_upload.py`
+### `populate_upload.py`
 
 Transfers genomic evidence data from evidence files to upload files, with automatic coordinate transformation.
 
