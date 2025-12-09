@@ -220,10 +220,10 @@ The evidence file documents genomic evidence for each allele. Each row represent
 | `d_rs_3_prime_end` | Integer | Optional | >d_rs_3_prime_start | End of D 3' recombination signal |
 | `d_rs_5_prime_start` | Integer | Optional | ≥1 | Start of D 5' recombination signal |
 | `d_rs_5_prime_end` | Integer | Optional | >d_rs_5_prime_start | End of D 5' recombination signal |
-| `j_codon_frame` | Integer | Optional | 1, 2, 3 | Reading frame for J gene |
+| `j_codon_frame` | Integer | Required for J | 1, 2, 3 | Reading frame for J gene |
 | `j_rs_start` | Integer | Optional | ≥1 | Start of J recombination signal |
 | `j_rs_end` | Integer | Optional | >j_rs_start | End of J recombination signal |
-| `j_cdr3_end` | Integer | Optional | ≥1 | End of CDR3 region (WGG/FGG motif) |
+| `j_cdr3_end` | Integer | Required for J | ≥1 | End of CDR3 region (WGG/FGG motif) |
 | `c_exon_1_start` | Integer | Optional | ≥1 | Start of constant region exon 1 |
 | `c_exon_1_end` | Integer | Optional | ≥1 | End of constant region exon 1 |
 | `c_exon_2_start` | Integer | Optional | ≥1 | Start of constant region exon 2 |
@@ -245,6 +245,8 @@ The evidence file documents genomic evidence for each allele. Each row represent
 | `c_sc_sequence` | String | Optional | DNA sequence | constant region IG heavy chain secretory domain sequence |
 | `utr_3_prime_start` | Integer | Optional | ≥1 | Start of 3' UTR |
 | `utr_3_prime_end` | Integer | Optional | >utr_3_prime_start | End of 3' UTR |
+
+C exon delineations are required for C genes. The number of exons required varies depending on species, locus, and isotype.
 
 
 #### Coordinate Requirements
