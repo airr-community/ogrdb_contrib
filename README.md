@@ -125,7 +125,7 @@ Typically, `sequence` will just be the sequence of the core coding region (V-, D
 
 As in the evidence file, the following additional notes apply:
 
-- For J genes, `j_codon_frame` and `j_cdr3_end` must also be completed. The [receptor-utils](https://github.com/williamdlees/receptor_utils) tool `annot_j` can be used to determine `j_codon_frame` and `j_cdr3_end` values.
+- For J genes, `j_codon_frame` and `j_cdr3_end` must also be completed. The [receptor-utils](https://github.com/williamdlees/receptor_utils) tool `annot_j` can be used to determine `j_codon_frame` and `j_cdr3_end` values. Receptor-utils is listed in requirements.txt and therefore should be available to you if you have installed the dependencies.
 - For C genes, the transmembrane sequence should be put in `sequence`, `gene_start` should be 1 and `gene_end` should be the length of `sequence`.
 - For IG heavy chain C genes, if the secretory domain sequence is available, it should be put in the `c_sc_sequence` field.
 
