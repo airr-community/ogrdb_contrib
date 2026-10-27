@@ -32,7 +32,7 @@ def basic_checks(upload_file) -> Tuple[bool, List[str]]:
         'affirmation', 'chromosome', 'paralogs', 'varb_rep', 'notes', 'inferred_extension', 'ext_3_prime', 'ext_5_prime', 'curational_tags', 'mapped',
         'gene_start', 'gene_end', 'utr_5_prime_start', 'utr_5_prime_end', 'leader_1_start', 'leader_1_end', 'leader_2_start', 'leader_2_end', 
         'v_rs_start', 'v_rs_end', 'd_rs_3_prime_start', 'd_rs_3_prime_end', 'd_rs_5_prime_start', 'd_rs_5_prime_end', 'j_codon_frame', 'j_rs_start', 'j_rs_end', 'j_cdr3_end',
-        "c_exon_1_start", "c_exon_1_end", "c_exon_2_start", "c_exon_2_end", "c_exon_3_start",
+        "start", "end", "c_exon_1_start", "c_exon_1_end", "c_exon_2_start", "c_exon_2_end", "c_exon_3_start",
         "c_exon_3_end", "c_exon_4_start", "c_exon_4_end", "c_exon_5_start", "c_exon_5_end",
         "c_exon_6_start", "c_exon_6_end", "c_exon_7_start", "c_exon_7_end", "c_exon_8_start", "c_exon_8_end",
         "c_exon_9_start", "c_exon_9_end", "utr_3_prime_start", "utr_3_prime_end", "c_tm_sequence", "c_sc_sequence"
@@ -383,14 +383,7 @@ def validate_rearranged_only(row: Dict, row_num: int) -> List[str]:
     if not gene_start or not gene_end:
         errors.append(f"Row {row_num}: Rearranged only entries must have gene_start and gene_end completed")
         return errors
-    
-    start = row['start']
-    end = row['end']
-
-    if not start or not end:
-        errors.append(f"Row {row_num}: Rearranged only entries must have gene_start and gene_end completed")
-        return errors
-    
+        
     # Check that no other coordinates have values, except j_cdr3_end for J genes
     forbidden_coords = [
         'utr_5_prime_start', 'utr_5_prime_end',
