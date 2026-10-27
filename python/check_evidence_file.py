@@ -337,21 +337,18 @@ def validate_adjacency(row: Dict, row_num: int) -> List[str]:
             # Leader 2 (gap allowed between leader_1 and leader_2)
             if leader_2_start is not None and leader_2_end is not None:
                 features.append(('leader_2', leader_2_start, leader_2_end))
+
+                if leader_1_start is not None and leader_1_end is not None:
+                    if leader_2_start < leader_1_start:
+                        errors.append(f"Row {row_num}: leader_2_start ({leader_2_start}) should be >= leader_1_start ({leader_1_start}) in plus sense")
             
             # Gene (must be adjacent to last leader)
             if gene_start is not None and gene_end is not None:
                 features.append(('gene', gene_start, gene_end))
                 
-                # Check adjacency with leader
-                last_leader_end = None
-                if leader_2_end is not None:
-                    last_leader_end = leader_2_end
-                elif leader_1_end is not None:
-                    last_leader_end = leader_1_end
-                
-                if last_leader_end is not None and gene_start != last_leader_end + 1:
-                    errors.append(f"Row {row_num}: gene_start ({gene_start}) should be adjacent to last leader end + 1 ({last_leader_end + 1})")
-            
+                if leader_2_end is not None and gene_start != leader_2_end + 1:
+                    errors.append(f"Row {row_num}: gene_start ({gene_start}) should be adjacent to leader_2_end + 1 ({leader_2_end + 1})")
+                                
             # V recombination signal (must be adjacent to gene)
             if v_rs_start is not None and v_rs_end is not None:
                 features.append(('v_rs', v_rs_start, v_rs_end))
@@ -373,24 +370,21 @@ def validate_adjacency(row: Dict, row_num: int) -> List[str]:
                 if v_rs_end is not None and gene_start != v_rs_end + 1:
                     errors.append(f"Row {row_num}: gene_start ({gene_start}) should be adjacent to v_rs_end + 1 ({v_rs_end + 1})")
             
-            # Leader 2 (gap allowed between gene and leader_2)
+            # Leader 2 (must be adjacent to gene)
             if leader_2_start is not None and leader_2_end is not None:
                 features.append(('leader_2', leader_2_start, leader_2_end))
+
+                if gene_start is not None and gene_end is not None:
+                    if leader_2_start != gene_end + 1:
+                        errors.append(f"Row {row_num}: leader_2_start ({leader_2_start}) should be adjacent to gene_end + 1 ({gene_end + 1})")
             
-            # Leader 1 (must be adjacent to leader_2, or to gene if no leader_2)
+            # Leader 1 (gap allowed between leader 1 and leader 2)
             if leader_1_start is not None and leader_1_end is not None:
                 features.append(('leader_1', leader_1_start, leader_1_end))
-                
-                # Check adjacency with previous feature
-                prev_end = None
-                if leader_2_end is not None:
-                    prev_end = leader_2_end
-                elif gene_end is not None:
-                    prev_end = gene_end
-                
-                if prev_end is not None and leader_1_start != prev_end + 1:
-                    prev_feature = 'leader_2' if leader_2_end is not None else 'gene'
-                    errors.append(f"Row {row_num}: leader_1_start ({leader_1_start}) should be adjacent to {prev_feature}_end + 1 ({prev_end + 1})")
+
+                if leader_2_start is not None and leader_2_end is not None:
+                    if leader_1_start < leader_2_start:
+                        errors.append(f"Row {row_num}: leader_1_start ({leader_1_start}) should be >= leader_2_start ({leader_2_start}) in minus sense")
             
             # UTR 5' prime (must be adjacent to leader_1)
             if utr_5_start is not None and utr_5_end is not None:
