@@ -12,6 +12,7 @@ import csv
 from typing import Dict, List, Tuple
 
 from receptor_utils import simple_bio_seq as simple
+from receptor_utils import aux_formats
 
 
 def basic_checks_upload(upload_file) -> Tuple[bool, List[str]]:
@@ -48,7 +49,7 @@ def basic_checks_upload(upload_file) -> Tuple[bool, List[str]]:
         for row in reader:
             for col in expected_columns:
                 if col in row:
-                    if row[col].strip() != row[col]:
+                    if col != 'notes' and row[col].strip() != row[col]:
                         errors.append(f"Leading/trailing spaces found in row {row['gene_label']} column '{col}'")
 
     return len(errors) == 0, errors
@@ -222,6 +223,9 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
             return int(val)
         except ValueError:
             return None
+        
+    # if evidence_row['gene_label'] == 'IGKJ2-CVFT*01':
+   #     breakpoint()
     
     # For coordinate transformation, we need to know the order of features
     # in the evidence sequence and transform them to be relative to position 1
@@ -251,6 +255,10 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
         leader_2_start = get_coord('leader_2_start')
         leader_2_end = get_coord('leader_2_end')
         if leader_2_start is not None and leader_2_end is not None:
+            if leader_1_end < leader_2_start:
+                features.append(('leader_intron', leader_1_end + 1, leader_2_start - 1))
+            else:
+                features.append(('leader_intron', leader_2_end + 1, leader_1_start - 1))
             features.append(('leader_2', leader_2_start, leader_2_end))
         
         v_rs_start = get_coord('v_rs_start')
@@ -292,13 +300,18 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
     if not features:
         return transformed
     
+    # offset reflects the number of bases in the evidence sequence before the first feature
+    offset = 0
+    
     # Sort features by start coordinate (handle both + and - sense)
     if sense in ['-', 'minus']:
         # For minus sense, features are in reverse order in the genomic sequence
         # but should be in forward order in the final sequence
         features.sort(key=lambda x: x[1], reverse=True)
+        offset = get_coord('end') - features[0][2]  # bases after last feature
     else:
         features.sort(key=lambda x: x[1])
+        offset = features[0][1] - get_coord('start')  # bases before first feature
     
     # Get the start of the evidence sequence for coordinate adjustment
     evidence_start = get_coord('start')
@@ -306,7 +319,7 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
         return transformed
     
     # Transform coordinates using the approach from make_ogrdb_upload.py
-    p = 1  # Current position in the transformed sequence
+    p = 1 + offset  # Current position in the transformed sequence
     
     for feature_name, feat_start, feat_end in features:
         # Calculate the feature length
@@ -323,6 +336,9 @@ def transform_coordinates(evidence_row: Dict) -> Dict[str, str]:
             elif feature_name == 'leader_1':
                 transformed['leader_1_start'] = str(p)
                 transformed['leader_1_end'] = str(p + feature_length - 1)
+            elif feature_name == 'leader_intron':
+                transformed['leader_intron_start'] = str(p)
+                transformed['leader_intron_end'] = str(p + feature_length - 1)
             elif feature_name == 'leader_2':
                 transformed['leader_2_start'] = str(p)
                 transformed['leader_2_end'] = str(p + feature_length - 1)
@@ -447,13 +463,8 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
             updated_rows.append(upload_row)
             continue
 
-        # Transfer sequence
-        evidence_sequence = evidence_row['sequence']
-        if evidence_sequence:
-            upload_row['sequence'] = evidence_sequence
-        
         # Transform and transfer coordinates
-        try:
+        try:        
             transformed_coords = transform_coordinates(evidence_row)
             
             # Update upload row with transformed coordinates
@@ -466,6 +477,16 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
             
         except Exception as e:
             errors.append(f"Upload file row {row_num}: Error transforming evidence coordinates for {gene_label}: {e}")
+
+        # Transfer sequence
+        evidence_sequence = evidence_row['sequence']
+        if evidence_sequence:
+            upload_row['sequence'] = evidence_sequence
+
+        # Check that the evidence gene sequence matches the upload sequence
+        evidence_gene_seq = upload_row['sequence'][int(upload_row['gene_start']) - 1: int(upload_row['gene_end'])]
+        if evidence_row['sequence_type'] == 'V' and upload_row['sequence_gapped'].replace('.', '') != evidence_gene_seq:
+            errors.append(f"Upload file row {row_num} {gene_label}: the sequence delineated for 'gene' in the evidence file does not match the gapped sequence with gaps removed")
         
         updated_rows.append(upload_row)
     
@@ -486,6 +507,42 @@ def transfer_evidence_to_upload(evidence_path: str, upload_path: str) -> Tuple[b
         return False, errors
     
     return len(errors) == 0, errors
+
+
+def annotate_j_genes(records: List[Dict], is_evidence_file: bool) -> tuple[List[Dict], List[Dict]]:
+    """
+    Annotate J gene features if they are currently blank in the records.
+    If any J annotation fields are present, skip annotation for that record.
+    
+    Args:
+        records: List of upload or evidence file rows
+        is_evidence_file: True if records are from evidence file, False if from upload file
+
+    Returns:
+        List of updated records and list of annotation results
+    """
+
+    annotation_results = []
+    for rec in records:
+        s_type = rec['sequence_type'] if is_evidence_file else rec['type']
+        if s_type.endswith('J'):
+            if ('j_codon_frame' not in rec or not rec['j_codon_frame']) and ('j_cdr3_end' not in rec or not rec['j_cdr3_end']):
+                if is_evidence_file:
+                    # in the evidence file, the sequence is always 5' to 3' but the coordinates reflect the sense
+                    if rec['sense'] == '-':
+                        rs = simple.reverse_complement(rec['sequence'])
+                        seq = rs[int(rec['gene_start']) - int(rec['start']): int(rec['gene_end']) - int(rec['start']) + 1]
+                        seq = simple.reverse_complement(seq)
+                    else:
+                        seq = rec['sequence'][int(rec['gene_start']) - int(rec['start']): int(rec['gene_end']) - int(rec['start']) + 1]
+                else:
+                    seq = rec['sequence'][int(rec['gene_start']) - 1: int(rec['gene_end'])]
+
+                j_features = aux_formats.results_from_seqs({rec['gene_label']: seq})
+                j_features = j_features[0]
+                rec['j_codon_frame'] = j_features.frame
+                rec['j_cdr3_end'] = j_features.cdr3_pos
+                annotation_results.append(j_features._asdict())
 
 
 def main():
@@ -512,6 +569,9 @@ Examples:
     parser.add_argument('upload_file',
                         help='Path to the upload CSV file to update')
     
+    parser.add_argument('--annotate_j', '-j', action='store_true',
+                        help='Annotate J gene features if they are currently blank in the files')
+    
     args = parser.parse_args()
     
     print(f"Evidence file: {args.evidence_file}")
@@ -533,8 +593,35 @@ Examples:
             print(f"  • {error}")
         return 1
     
+    j_annotation_results = []
+
+    if args.annotate_j:
+        # Annotate J genes in evidence file
+        evidence_rows = simple.read_csv(args.evidence_file)
+        updated_evidence_rows, annotation_results = annotate_j_genes(evidence_rows, is_evidence_file=True)
+        if annotation_results:
+            print(f"Annotated J gene features in evidence file: {len(annotation_results)} records updated")
+            backup_path = args.evidence_file + ".backup"
+            simple.write_csv(backup_path, simple.read_csv(args.evidence_file))
+            print(f"Created backup: {backup_path}")
+            simple.write_csv(args.evidence_file, updated_evidence_rows)
+            j_annotation_results.extend(annotation_results)
+    
     success, errors = transfer_evidence_to_upload(args.evidence_file, args.upload_file)
     
+    if args.annotate_j:
+        # Annotate J genes in upload file
+        upload_rows = simple.read_csv(args.upload_file)
+        updated_upload_rows, annotation_results = annotate_j_genes(upload_rows, is_evidence_file=False)
+        if annotation_results:
+            simple.write_csv(args.upload_file, updated_upload_rows)
+            print(f"Annotated J gene features in upload file: {len(annotation_results)} records updated")
+            j_annotation_results.extend(annotation_results)
+
+    if j_annotation_results:
+        simple.write_csv("j_gene_annotations.csv", j_annotation_results)
+        print(f"J gene annotation results written to j_gene_annotations.csv")
+
     if success and len(errors) == 0:
         print("✅ Evidence transfer completed successfully!")
         return 0
@@ -554,3 +641,4 @@ Examples:
 
 if __name__ == "__main__":
     sys.exit(main())
+    
