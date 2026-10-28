@@ -7,6 +7,7 @@ Checks upload CSV files against evidence files for proper formatting and data in
 import argparse
 import csv
 import os
+import re
 import sys
 from typing import Dict, List, Tuple
 
@@ -149,7 +150,17 @@ def validate_v_gene_gapped_sequence(row: Dict, row_num: int) -> List[str]:
     if '.' not in sequence_gapped:
         errors.append(f"Row {row_num}: V gene sequence_gapped must contain periods (.)")
         return errors
-    
+
+    # Check gaps occur on codon boundaries and occupy complete codons
+    for gap in re.finditer(r'\.+', sequence_gapped):
+        if len(gap.group()) % 3 != 0:
+            errors.append(f"Row {row_num}: Each gap in V gene sequence_gapped must contain full codons (multiple of three periods)")
+            return errors
+        bases_before_gap = sequence_gapped[:gap.start()].replace('.', '')
+        if len(bases_before_gap) % 3 != 0:
+            errors.append(f"Row {row_num}: Each gap in V gene sequence_gapped must start on a codon boundary")
+            return errors
+
     # Check that removing periods gives the same sequence as 'sequence'
     ungapped_sequence = sequence_gapped.replace('.', '').upper()
     start = int(row['gene_start'])
